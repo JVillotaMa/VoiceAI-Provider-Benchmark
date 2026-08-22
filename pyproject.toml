@@ -6,7 +6,19 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [{ name = "Jaime Villota", email = "jvillotama@gmail.com" }]
-dependencies = []
+dependencies = [
+    "fastapi>=0.141,<1",
+    "loguru>=0.7.3",
+    # Upper bound is deliberate. Pipecat moved processor names and parameters between 0.0.x and
+    # 1.x, and its params objects are Pydantic models that drop unknown fields silently — a major
+    # bump would reconfigure the instrument without failing. See
+    # openspec/changes/add-caller-agent/design.md, decision 6.
+    # The `websocket` extra is the Twilio Media Streams transport; it brings fastapi with it.
+    "pipecat-ai[cartesia,deepgram,openai,silero,websocket]>=1.7.0,<2",
+    "python-dotenv>=1.2.3",
+    "twilio>=9.11.0,<10",
+    "uvicorn>=0.52.4,<1",
+]
 
 [dependency-groups]
 dev = [
@@ -17,6 +29,9 @@ dev = [
     "pre-commit>=4.3",
     "commitizen>=4.9",
 ]
+
+[project.scripts]
+voicebench-api = "voicebench.api:main"
 
 [build-system]
 requires = ["uv_build>=0.9.21,<0.10.0"]
