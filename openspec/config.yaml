@@ -1,0 +1,50 @@
+schema: spec-driven
+
+context: |
+  VoiceAI Provider Benchmark — an independent, open source, reproducible latency benchmark for
+  voice AI agent platforms, measured over real phone calls from Europe.
+
+  Platforms under test: Vapi, Retell, ElevenLabs, Pipecat, LiveKit.
+
+  WHY IT EXISTS
+  Commercial benchmarks (Cekura, Coval) run on proprietary platforms, are not reproducible by
+  third parties, and measure from US-East. Our differentiators are independence, reproducibility
+  and European measurement. Anyone must be able to clone the repo, plug in their own API keys and
+  re-run the exact same experiment.
+
+  MEASUREMENT DESIGN — treat as invariant. Changing any of it invalidates comparability with
+  already-published runs, so it needs an explicit change proposal.
+  - Caller: a Pipecat agent with an LLM but a closed script (6 turns, fixed intents in fixed
+    order). Natural conversation, equivalent stimulus on every platform.
+  - Agent under test: created by us on each platform with the same prompt, same voice, same LLM.
+    The platform is the only variable.
+  - Transport: real phone call.
+  - Recording: bidirectional, two separate channels (caller / agent), captured from our end so
+    the instrument is identical everywhere.
+  - Timestamps: extracted offline from the audio files via energy detection (windowed RMS /
+    Silero VAD). Never from platform-internal pipeline events — not comparable, not independently
+    verifiable.
+  - Primary metric: response latency = time from the last caller audio frame with energy to the
+    first agent audio frame with energy.
+  - Reporting: P50, P95, P99. Never means — in voice the tail is what breaks the conversation.
+
+  TECH STACK
+  Python 3.12, managed exclusively with uv (no pip, no requirements.txt).
+  ruff (lint + format), mypy, deptry (unused/missing deps), pytest, pre-commit, commitizen.
+  Conventional commits. Monorepo under src/voicebench: caller/, providers/, analysis/.
+  Raw audio in data/recordings/ (gitignored, regenerable); published outputs in results/.
+
+  CONVENTIONS
+  - Secrets only in .env (gitignored); every key documented in .env.example.
+  - Never state a latency figure that isn't backed by a committed run in results/.
+  - Reproducibility beats convenience: hidden config, unpinned model versions or reliance on
+    platform-internal telemetry are bugs.
+  - Full working agreement lives in CLAUDE.md at the repo root.
+
+rules:
+  proposal:
+    - State explicitly whether the change touches the measurement design; if it does, say what
+      it does to comparability with previously published runs.
+  design:
+    - Keep the instrument identical across platforms — anything platform-specific belongs in
+      providers/, never in caller/ or analysis/.

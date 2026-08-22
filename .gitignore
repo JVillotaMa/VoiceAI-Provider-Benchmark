@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets: platform API keys (Vapi, Retell, LiveKit, Twilio...)
+.env
+.env.*
+!.env.example
+
+# Raw benchmark artifacts: audio is heavy and re-generable, results are committed
+data/recordings/
+*.wav
+*.mp3
