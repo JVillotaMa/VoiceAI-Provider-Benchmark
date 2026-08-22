@@ -35,7 +35,20 @@ to the points below invalidates comparability with previously published runs.
 - **The caller never re-prompts a slow agent.** A re-prompt truncates that agent's latency sample
   and would systematically censor exactly the platforms P99 exists to expose. It waits up to 20 s;
   reaching that ceiling is a *failed* turn, recorded as censored — never dropped.
-- **Transport**: real phone call. Not WebRTC-only shortcuts.
+- **Transport**: real phone call over **Twilio Media Streams**, dialled out from our own machine.
+  Chosen over Daily PSTN and Daily+Twilio SIP for hop count: every hop between the phone network
+  and the point where we record adds jitter that is not the platform's. A constant offset is
+  harmless — it lands on all five equally — but variance inflates the tail on every platform at
+  once and makes P95/P99 worse at telling them apart.
+- **Audio is 8 kHz everywhere**, frozen in `caller/agent.py` beside the LLM snapshot and the voice
+  id. The instrument is always a phone call, so the rate belongs to the caller, not to whichever
+  transport is plugged in. The stimulus is therefore not "that voice" but *that voice through
+  mu-law 8 kHz* — which is what every platform actually hears.
+- **Not yet pinned, and must be before any published run**: the country of the outbound number
+  (today a US Twilio number) and the Twilio edge serving the media stream. Together they are what
+  "measured from Europe" concretely means. Changing either later invalidates comparability exactly
+  as changing the voice would. A European outbound number is arguably more defensible for the
+  project's thesis.
 - **Recording**: bidirectional, **two separate channels** (caller audio / agent audio), captured
   **from our end** so the instrument is identical everywhere.
 - **Timestamps**: extracted **offline from the audio files** via energy detection (windowed RMS /
@@ -76,6 +89,16 @@ docs/          Methodology writeups
 | Unused / missing deps | `uv run deptry src` |
 | Tests | `uv run pytest` |
 | Commit (guided) | `uv run cz commit` |
+| Test call API | `uv run python -c "from voicebench.api import main; main()"` (port 8000) |
+| Expose it to Twilio | `ngrok http 8000` → put the https URL in `PUBLIC_BASE_URL` |
+| Place a call | `POST /test_call` with header `X-API-Key`. No body, no parameters. |
+
+The test endpoint dials one number, fixed in `.env`. The destination is never a request parameter:
+an authenticated endpoint that dials arbitrary numbers becomes a toll-fraud machine the moment its
+key leaks, and this one faces the internet whenever the tunnel is up.
+
+When you answer, **greet it first** — the caller never speaks first. Stay silent and it ends on the
+20-second idle timeout, which is correct behaviour and looks exactly like a bug.
 
 `pre-commit` runs ruff, mypy, deptry and the commit-message check on every commit.
 Install the hooks once with `uv run pre-commit install --install-hooks -t pre-commit -t commit-msg`.
