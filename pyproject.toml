@@ -7,15 +7,17 @@ license = "MIT"
 requires-python = ">=3.12"
 authors = [{ name = "Jaime Villota", email = "jvillotama@gmail.com" }]
 dependencies = [
+    "fastapi>=0.141,<1",
     "loguru>=0.7.3",
     # Upper bound is deliberate. Pipecat moved processor names and parameters between 0.0.x and
     # 1.x, and its params objects are Pydantic models that drop unknown fields silently — a major
     # bump would reconfigure the instrument without failing. See
     # openspec/changes/add-caller-agent/design.md, decision 6.
-    # No transport extra yet: the caller takes its transport as an argument and the telephony one
-    # (`websocket`, which is what Twilio uses) lands with the telephony change.
-    "pipecat-ai[cartesia,deepgram,openai,silero]>=1.7.0,<2",
+    # The `websocket` extra is the Twilio Media Streams transport; it brings fastapi with it.
+    "pipecat-ai[cartesia,deepgram,openai,silero,websocket]>=1.7.0,<2",
     "python-dotenv>=1.2.3",
+    "twilio>=9.11.0,<10",
+    "uvicorn>=0.52.4,<1",
 ]
 
 [dependency-groups]
