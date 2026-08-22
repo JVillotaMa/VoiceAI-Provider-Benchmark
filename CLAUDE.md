@@ -16,10 +16,25 @@ Platforms under test: **Vapi, Retell, ElevenLabs, Pipecat, LiveKit**.
 The whole value of the project is that the instrument is identical across platforms. Any change
 to the points below invalidates comparability with previously published runs.
 
-- **Caller agent**: a Pipecat agent with an LLM but a *closed script* — 6 turns, fixed intents in
-  fixed order. Natural conversation, equivalent stimulus on every platform.
+- **Caller agent**: a Pipecat agent with a free-running LLM on a *closed script* — **7 intents in
+  fixed order**, one intent per turn. Turn count varies (negotiation can take more than one
+  exchange); wording varies too. That non-determinism is absorbed by running many calls per
+  platform, not by constraining the caller. Bounded by one rule in the script: **accept the second
+  counteroffer**, so negotiation length does not differ per platform.
+- **The caller is frozen.** Its LLM snapshot (`gpt-4.1-mini-2025-04-14`, dated on purpose) and its
+  Cartesia voice id are constants in `caller/agent.py`, never parameters. The voice especially:
+  how an utterance ends prosodically is what triggers the agent under test's endpointing, so it
+  *is* the stimulus. Personality is the only parameter, and it belongs in the result rows next to
+  the platform — a chattier caller measures differently on every platform at once.
 - **Agent under test**: created by us on each platform with the **same prompt, same voice, same
   LLM**. The platform is the only variable.
+- **No filler audio on the agent under test.** Several platforms can play a pre-recorded phrase
+  while the LLM is still generating. Under a metric defined as *first agent frame with energy*,
+  such a platform wins by playing a wav file. Disabled everywhere; a platform that cannot disable
+  it gets an asterisk in the report.
+- **The caller never re-prompts a slow agent.** A re-prompt truncates that agent's latency sample
+  and would systematically censor exactly the platforms P99 exists to expose. It waits up to 20 s;
+  reaching that ceiling is a *failed* turn, recorded as censored — never dropped.
 - **Transport**: real phone call. Not WebRTC-only shortcuts.
 - **Recording**: bidirectional, **two separate channels** (caller audio / agent audio), captured
   **from our end** so the instrument is identical everywhere.
