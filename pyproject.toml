@@ -6,7 +6,17 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 authors = [{ name = "Jaime Villota", email = "jvillotama@gmail.com" }]
-dependencies = []
+dependencies = [
+    "loguru>=0.7.3",
+    # Upper bound is deliberate. Pipecat moved processor names and parameters between 0.0.x and
+    # 1.x, and its params objects are Pydantic models that drop unknown fields silently — a major
+    # bump would reconfigure the instrument without failing. See
+    # openspec/changes/add-caller-agent/design.md, decision 6.
+    # No transport extra yet: the caller takes its transport as an argument and the telephony one
+    # (`websocket`, which is what Twilio uses) lands with the telephony change.
+    "pipecat-ai[cartesia,deepgram,openai,silero]>=1.7.0,<2",
+    "python-dotenv>=1.2.3",
+]
 
 [dependency-groups]
 dev = [
