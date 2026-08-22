@@ -1,0 +1,148 @@
+"""The caller agent: the instrument that places the call.
+
+One agent, frozen. The only thing that varies between measurement runs is the platform being
+dialled, and from here that is a phone number the caller never sees. The transport is an argument
+so the same pipeline works against a browser today and a phone line later.
+
+Nothing here is a measurement. Latency is extracted offline from the recorded audio; Pipecat's own
+timing observers are platform-internal telemetry and deliberately unused.
+"""
+
+import os
+import sys
+
+from dotenv import load_dotenv
+from loguru import logger
+from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
+from pipecat.frames.frames import EndWorkerFrame
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.worker import PipelineWorker
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.processors.aggregators.llm_response_universal import (
+    AssistantTurnStoppedMessage,
+    LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+    UserTurnStoppedMessage,
+)
+from pipecat.processors.frame_processor import FrameDirection
+from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.services.llm_service import FunctionCallParams
+from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.transports.base_transport import BaseTransport
+from pipecat.workers.runner import WorkerRunner
+
+from voicebench.caller.prompt import PERSONALITY_EASY, build_system_prompt
+
+# --- The instrument. Frozen. -------------------------------------------------------------------
+# Changing any of these invalidates comparability with runs already published in results/.
+
+# Dated snapshot on purpose: "gpt-4.1-mini" is a moving alias, and a repointed alias would
+# silently change the caller between runs. The caller's own LLM speed is outside the metric —
+# the stopwatch starts at the caller's last audio frame with energy — so this is chosen for
+# script-following, not latency.
+CALLER_LLM_MODEL = "gpt-4.1-mini-2025-04-14"
+
+# The voice IS the stimulus: how an utterance ends prosodically is what triggers the endpointing
+# of the agent under test. Not a parameter.
+CALLER_VOICE_ID = "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"
+
+# How much silence before we treat the other party's turn as over. Pipecat 1.x defaults this to
+# 0.2s, which is aggressive enough that any mid-sentence pause by the agent under test would make
+# our caller talk over it. Waiting longer costs the measurement nothing (caller-side turn
+# detection is outside the metric), but waiting far too long invites platforms to fill the silence
+# with "are you still there?", so this is deliberate and moderate rather than maximal.
+VAD_STOP_SECS = 0.8
+USER_TURN_STOP_TIMEOUT_SECS = 5.0
+
+# The caller never re-prompts a slow agent: a re-prompt truncates that agent's latency sample and
+# would systematically censor exactly the platforms P99 exists to expose. It waits, and if nothing
+# ever comes the call ends here. No usable voice agent answers at 20s, so reaching this ceiling is
+# a failed turn for the analysis layer to record as censored — never a slow one, never discarded.
+IDLE_TIMEOUT_SECS = 20.0
+
+REQUIRED_ENV_VARS = ("OPENAI_API_KEY", "DEEPGRAM_API_KEY", "CARTESIA_API_KEY")
+
+
+def _require_env() -> dict[str, str]:
+    """Read the credentials, naming what is missing instead of failing deep in a client."""
+    load_dotenv()
+    missing = [name for name in REQUIRED_ENV_VARS if not os.environ.get(name)]
+    if missing:
+        raise SystemExit(
+            f"Missing environment variable(s): {', '.join(missing)}.\n"
+            f"Copy .env.example to .env and fill them in."
+        )
+    return {name: os.environ[name] for name in REQUIRED_ENV_VARS}
+
+
+async def end_call(params: FunctionCallParams) -> None:
+    """End the phone call. Call this once you have thanked them and said goodbye."""
+    logger.info("caller: end_call")
+    await params.result_callback({"status": "call ended"})
+    await params.llm.push_frame(EndWorkerFrame(), FrameDirection.DOWNSTREAM)
+
+
+async def run_caller(
+    transport: BaseTransport,
+    personality: str = PERSONALITY_EASY,
+) -> None:
+    """Run one call to completion over the given transport."""
+    env = _require_env()
+
+    stt = DeepgramSTTService(api_key=env["DEEPGRAM_API_KEY"])
+    llm = OpenAILLMService(api_key=env["OPENAI_API_KEY"], model=CALLER_LLM_MODEL)
+    tts = CartesiaTTSService(api_key=env["CARTESIA_API_KEY"], voice_id=CALLER_VOICE_ID)
+
+    context = LLMContext(
+        messages=[{"role": "system", "content": build_system_prompt(personality)}],
+        tools=[end_call],
+    )
+    aggregators = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=VAD_STOP_SECS)),
+            user_turn_stop_timeout=USER_TURN_STOP_TIMEOUT_SECS,
+            # Empty on purpose: when the agent under test talks over the caller, the caller
+            # yields, as a human caller would. That turn is an overlapping and therefore invalid
+            # latency sample for the analysis layer to discard — not something to prevent by
+            # muting the other party into behaviour it never meets in production.
+            user_mute_strategies=[],
+        ),
+    )
+
+    @aggregators.user().event_handler("on_user_turn_stopped")
+    async def _log_them(
+        _aggregator: object, _strategy: object, msg: UserTurnStoppedMessage
+    ) -> None:
+        logger.info(f"THEM: {msg.content}")
+
+    @aggregators.assistant().event_handler("on_assistant_turn_stopped")
+    async def _log_us(_aggregator: object, msg: AssistantTurnStoppedMessage) -> None:
+        # `interrupted` marks turns the agent under test talked over. Those turns cannot yield a
+        # usable latency sample, and the analysis layer needs to know which ones they were.
+        mark = " [INTERRUPTED]" if msg.interrupted else ""
+        logger.info(f"CALLER{mark}: {msg.content}")
+
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            stt,
+            aggregators.user(),
+            llm,
+            tts,
+            transport.output(),
+            aggregators.assistant(),
+        ]
+    )
+
+    # No kickoff frame: the caller stays silent until the other party speaks, matching a real
+    # outbound call where the shop answers the phone.
+    worker = PipelineWorker(pipeline, idle_timeout_secs=IDLE_TIMEOUT_SECS)
+    await WorkerRunner().run(worker)
+
+
+def _setup_logging() -> None:
+    logger.remove()
+    logger.add(sys.stderr, level="INFO")
