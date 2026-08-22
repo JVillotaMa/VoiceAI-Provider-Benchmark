@@ -67,19 +67,21 @@ Install the hooks once with `uv run pre-commit install --install-hooks -t pre-co
 
 ## Rules
 
-1. **Code review before any PR.** Never open a PR without running `/code-review` first — and
+1. **Branches: work on `dev`, `main` is the published state.** Feature branches off `dev`,
+   `dev` reaches `main` through a PR. Never commit straight to `main`.
+2. **Code review before any PR.** Never open a PR without running `/code-review` first — and
    **always ask me before running it**. Do not launch it on your own initiative.
-2. **New library ⇒ run autoskills.** Whenever a new dependency is added (`uv add ...`), run
+3. **New library ⇒ run autoskills.** Whenever a new dependency is added (`uv add ...`), run
    `npx autoskills -a claude-code` so the skill set matches the stack. Skills flagged with a
    security warning get read before they are trusted.
-3. **OpenSpec for anything non-trivial.** Behaviour changes, new providers, new metrics: start
+4. **OpenSpec for anything non-trivial.** Behaviour changes, new providers, new metrics: start
    with `/opsx:propose`, then implement against the change. Bug fixes and chores can go direct.
-4. **Conventional commits**, enforced by commitizen. Small, scoped commits.
-5. **Never commit secrets or audio.** API keys live in `.env` (gitignored); `.env.example`
+5. **Conventional commits**, enforced by commitizen. Small, scoped commits.
+6. **Never commit secrets or audio.** API keys live in `.env` (gitignored); `.env.example`
    documents every key. Recordings stay in `data/recordings/`, gitignored.
-6. **Reproducibility beats convenience.** Anything that makes a run non-reproducible by a third
+7. **Reproducibility beats convenience.** Anything that makes a run non-reproducible by a third
    party (hidden config, unpinned model versions, platform-internal telemetry) is a bug.
-7. **Don't invent numbers.** Latency figures come from committed runs in `results/` or they don't
+8. **Don't invent numbers.** Latency figures come from committed runs in `results/` or they don't
    get stated. Ever. This is a benchmark; a fabricated number destroys the project's only asset.
 
 ## Context notes
