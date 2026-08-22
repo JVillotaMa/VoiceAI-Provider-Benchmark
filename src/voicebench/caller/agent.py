@@ -17,7 +17,7 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import EndWorkerFrame
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.worker import PipelineWorker
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     AssistantTurnStoppedMessage,
@@ -47,6 +47,13 @@ CALLER_LLM_MODEL = "gpt-4.1-mini-2025-04-14"
 # The voice IS the stimulus: how an utterance ends prosodically is what triggers the endpointing
 # of the agent under test. Not a parameter.
 CALLER_VOICE_ID = "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"
+
+# The instrument is always a phone call, so the audio rate belongs to the caller rather than to
+# whichever transport happens to be plugged in. Cartesia is told to render at 8 kHz directly
+# instead of letting the telephony serializer resample down from 24 kHz — one resample fewer, and
+# the stimulus is then defined end to end: not "that voice" but that voice through mu-law 8 kHz,
+# which is what every platform under test actually hears.
+AUDIO_SAMPLE_RATE = 8000
 
 # How much silence before we treat the other party's turn as over. Pipecat 1.x defaults this to
 # 0.2s, which is aggressive enough that any mid-sentence pause by the agent under test would make
@@ -93,7 +100,11 @@ async def run_caller(
 
     stt = DeepgramSTTService(api_key=env["DEEPGRAM_API_KEY"])
     llm = OpenAILLMService(api_key=env["OPENAI_API_KEY"], model=CALLER_LLM_MODEL)
-    tts = CartesiaTTSService(api_key=env["CARTESIA_API_KEY"], voice_id=CALLER_VOICE_ID)
+    tts = CartesiaTTSService(
+        api_key=env["CARTESIA_API_KEY"],
+        voice_id=CALLER_VOICE_ID,
+        sample_rate=AUDIO_SAMPLE_RATE,
+    )
 
     context = LLMContext(
         messages=[{"role": "system", "content": build_system_prompt(personality)}],
@@ -102,7 +113,13 @@ async def run_caller(
     aggregators = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=VAD_STOP_SECS)),
+            # Silero supports 8 kHz natively but is less accurate there than at 16 kHz, which
+            # makes the framework's 0.2s default worse rather than better. Rate passed explicitly
+            # rather than relying on it being propagated.
+            vad_analyzer=SileroVADAnalyzer(
+                sample_rate=AUDIO_SAMPLE_RATE,
+                params=VADParams(stop_secs=VAD_STOP_SECS),
+            ),
             user_turn_stop_timeout=USER_TURN_STOP_TIMEOUT_SECS,
             # Empty on purpose: when the agent under test talks over the caller, the caller
             # yields, as a human caller would. That turn is an overlapping and therefore invalid
@@ -139,7 +156,14 @@ async def run_caller(
 
     # No kickoff frame: the caller stays silent until the other party speaks, matching a real
     # outbound call where the shop answers the phone.
-    worker = PipelineWorker(pipeline, idle_timeout_secs=IDLE_TIMEOUT_SECS)
+    worker = PipelineWorker(
+        pipeline,
+        idle_timeout_secs=IDLE_TIMEOUT_SECS,
+        params=PipelineParams(
+            audio_in_sample_rate=AUDIO_SAMPLE_RATE,
+            audio_out_sample_rate=AUDIO_SAMPLE_RATE,
+        ),
+    )
     await WorkerRunner().run(worker)
 
 

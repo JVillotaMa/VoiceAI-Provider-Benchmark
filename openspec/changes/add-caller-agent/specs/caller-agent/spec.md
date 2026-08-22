@@ -180,6 +180,39 @@ under test's endpointing — and SHALL NOT be exposed as a runtime parameter.
 - **WHEN** the caller is started
 - **THEN** no argument allows the TTS voice to be changed
 
+### Requirement: Audio is 8 kHz
+
+The caller's audio SHALL be 8000 Hz throughout the pipeline, frozen alongside the LLM snapshot and
+the voice id. The instrument is always a phone call, so the rate is a property of the caller and
+SHALL NOT be supplied by whichever transport is plugged in.
+
+The text-to-speech service SHALL be told to render at 8 kHz directly rather than letting a
+telephony serializer resample down from a higher rate.
+
+This completes the definition of the stimulus: not "that voice", but **that voice through mu-law
+8 kHz** — which is what every platform under test actually hears. Changing the rate invalidates
+comparability exactly as changing the voice would.
+
+#### Scenario: Pipeline rate
+
+- **WHEN** the pipeline is started
+- **THEN** both input and output audio rates are 8000 Hz
+
+#### Scenario: Speech synthesis rate
+
+- **WHEN** the text-to-speech service is configured
+- **THEN** it is asked for 8000 Hz output
+
+#### Scenario: Voice activity detection rate
+
+- **WHEN** the voice activity detector is configured
+- **THEN** it is given 8000 Hz explicitly rather than relying on a default
+
+#### Scenario: Transport does not decide the rate
+
+- **WHEN** a transport is supplied
+- **THEN** it does not determine the pipeline's audio rate
+
 ### Requirement: Transport is injected
 
 The caller pipeline SHALL receive its transport as an argument, so that switching between local
