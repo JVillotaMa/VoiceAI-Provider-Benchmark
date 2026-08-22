@@ -130,10 +130,10 @@ Files saved to `outputs/` are automatically returned:
 
 ```python
 # These files will be in the response
-plt.savefig('outputs/chart.png')
-df.to_csv('outputs/data.csv')
-video.write_videofile('outputs/video.mp4')
-mesh.export('outputs/model.stl')
+plt.savefig("outputs/chart.png")
+df.to_csv("outputs/data.csv")
+video.write_videofile("outputs/video.mp4")
+mesh.export("outputs/model.stl")
 ```
 
 ## Variants
