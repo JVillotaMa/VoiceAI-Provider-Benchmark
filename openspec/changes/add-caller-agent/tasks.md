@@ -32,27 +32,27 @@
 - [x] 4.4 `uv run deptry src`
 - [x] 4.5 `uv run pytest`
 
-## 5. Behavioural validation — DEFERRED to the telephony change
+## 5. Behavioural validation — done over real telephony
 
-Dropped from this change on purpose. A browser loop at 16 kHz answers nothing about 8 kHz mu-law
-over PSTN, and the first real conversation will happen over the phone anyway. Carry this checklist
-into the telephony change and run it on a call to your own number, playing the shop employee.
+Deferred out of this change on purpose and completed in `add-twilio-test-call`: a browser loop at
+16 kHz answers nothing about 8 kHz mu-law over PSTN, and the first real conversation was always
+going to happen over the phone.
 
-**Status of this change: the caller has never held a conversation.** It imports, type-checks, and
-its prompt is tested. The pipeline itself is unexercised.
+**Validated on a real outbound call**, author playing the shop employee. The caller holds the
+script, ends the call itself, and hangs up on silence rather than re-prompting.
 
-- [ ] 5.1 The caller stays silent until you greet it
-- [ ] 5.2 It asks the seven intents in order, one per turn, never two in one utterance
-- [ ] 5.3 Answer evasively on one intent — it re-addresses that intent instead of advancing
-- [ ] 5.4 Counter three times — it accepts on the second counteroffer
-- [ ] 5.5 Stay silent for 25 seconds mid-call — it never re-prompts, and the call ends at the timeout
-- [ ] 5.6 It thanks you, calls `end_call`, and the call terminates
-- [ ] 5.7 Iterate `TASK` / `PERSONALITY_EASY` until 5.1–5.6 hold, then stop touching the prompt
+- [x] 5.1 The caller stays silent until you greet it
+- [x] 5.2 It asks the seven intents in order, one per turn, never two in one utterance
+- [x] 5.3 Answer evasively on one intent — it re-addresses that intent instead of advancing
+- [x] 5.4 Counter three times — it accepts on the second counteroffer
+- [x] 5.5 Stay silent for 25 seconds mid-call — it never re-prompts, and the call ends at the timeout
+- [x] 5.6 It thanks you, calls `end_call`, and the call terminates
+- [x] 5.7 Iterate `TASK` / `PERSONALITY_EASY` until 5.1–5.6 hold, then stop touching the prompt
 
 ## 6. Documentation and landing
 
 - [x] 6.1 Update `CLAUDE.md`: caller is 7 intents with variable turn count, not "6 turns"
 - [x] 6.2 Add the no-filler constraint on agents under test to the measurement design section of `CLAUDE.md`, so `providers/` inherits it
 - [x] 6.3 Note in `CLAUDE.md` that the caller LLM snapshot and TTS voice id are frozen, and that changing either invalidates comparability
-- [ ] 6.4 Conventional commits on `dev`, scoped small (`feat(caller): ...`, `docs: ...`)
-- [ ] 6.5 Ask before running `/code-review` (rule 2); no PR to `main` without it
+- [x] 6.4 Conventional commits on `dev`, scoped small (`feat(caller): ...`, `docs: ...`)
+- [x] 6.5 Ask before running `/code-review` (rule 2); no PR to `main` without it

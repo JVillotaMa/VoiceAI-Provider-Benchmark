@@ -57,14 +57,14 @@ trial for measurement.
 - [x] 6.1 `ngrok http` the app and put the URL in the environment
 - [x] 6.2 POST from Postman with the key — the phone rings
 - [x] 6.3 Answer and greet it as the shop. **It does not speak first**; stay silent and it dies at the 20-second idle timeout, which is correct behaviour and looks like a bug
-- [ ] 6.4 Close the seven behavioural checks deferred from `add-caller-agent`, now over real telephony: silent until greeted, seven intents in order one per turn, re-addresses an evaded intent, accepts the second counteroffer, never re-prompts through a 25-second silence, thanks and calls `end_call`, line drops
-- [ ] 6.5 Mark those checks done in `add-caller-agent/tasks.md` — that change stays open precisely for this
-- [ ] 6.6 Confirm audio quality at 8 kHz is good enough for the caller's STT to follow the conversation; if it is not, that is a finding about the instrument, not a bug to paper over
+- [x] 6.4 Close the seven behavioural checks deferred from `add-caller-agent`, now over real telephony: silent until greeted, seven intents in order one per turn, re-addresses an evaded intent, accepts the second counteroffer, never re-prompts through a 25-second silence, thanks and calls `end_call`, line drops
+- [x] 6.5 Mark those checks done in `add-caller-agent/tasks.md` — that change stays open precisely for this
+- [x] 6.6 Confirm audio quality at 8 kHz is good enough for the caller's STT to follow the conversation; if it is not, that is a finding about the instrument, not a bug to paper over
 
 ## 7. Documentation and landing
 
 - [x] 7.1 Record in `CLAUDE.md` that the transport of the instrument is Twilio Media Streams at 8 kHz, and that the caller's audio rate is frozen alongside its LLM snapshot and voice id
 - [x] 7.2 Note in `CLAUDE.md` that the outbound number's country and the Twilio edge are unpinned, define what "measured from Europe" concretely means, and must be fixed before any published run
 - [x] 7.3 Document the run command and the tunnel step
-- [ ] 7.4 Conventional commits on `dev`, scoped small
-- [ ] 7.5 Ask before running `/code-review` (rule 2); no PR to `main` without it
+- [x] 7.4 Conventional commits on `dev`, scoped small
+- [x] 7.5 Ask before running `/code-review` (rule 2); no PR to `main` without it
