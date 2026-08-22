@@ -11,7 +11,6 @@ timing observers are platform-internal telemetry and deliberately unused.
 import os
 import sys
 
-from dotenv import load_dotenv
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -48,6 +47,17 @@ CALLER_LLM_MODEL = "gpt-4.1-mini-2025-04-14"
 # of the agent under test. Not a parameter.
 CALLER_VOICE_ID = "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"
 
+# Pinned for the same reason as the voice, and easy to forget precisely because the library
+# supplies a default: a pipecat bump inside our own `>=1.7,<2` range can change the default TTS
+# model, and the voice would come out of a different synthesiser without a single line of our code
+# changing. A voice id alone does not freeze the stimulus — the model that renders it does.
+CALLER_TTS_MODEL = "sonic-3.5"
+
+# The transcription model is not part of the stimulus — the agent under test never hears it — but
+# it decides what our caller believes it was told, which is what drives the script forward. Pinned
+# so a run that derails can be attributed rather than guessed at.
+CALLER_STT_MODEL = "nova-3-general"
+
 # The instrument is always a phone call, so the audio rate belongs to the caller rather than to
 # whichever transport happens to be plugged in. Cartesia is told to render at 8 kHz directly
 # instead of letting the telephony serializer resample down from 24 kHz — one resample fewer, and
@@ -72,13 +82,22 @@ IDLE_TIMEOUT_SECS = 20.0
 REQUIRED_ENV_VARS = ("OPENAI_API_KEY", "DEEPGRAM_API_KEY", "CARTESIA_API_KEY")
 
 
-def _require_env() -> dict[str, str]:
-    """Read the credentials, naming what is missing instead of failing deep in a client."""
-    load_dotenv()
+def require_env() -> dict[str, str]:
+    """Read the credentials, naming what is missing instead of failing deep in a client.
+
+    `RuntimeError`, not `SystemExit`: the latter is a BaseException, so it walks straight through
+    the `except Exception` of any caller — including a websocket handler holding a live, billed
+    phone call open.
+
+    Reads the environment and nothing else. It deliberately does not call `load_dotenv()`: a
+    validation function that quietly repopulates the process environment from a file on every
+    call cannot be reasoned about, and cannot be tested — unsetting a variable would simply be
+    undone. Loading `.env` happens once, where the process starts.
+    """
     missing = [name for name in REQUIRED_ENV_VARS if not os.environ.get(name)]
     if missing:
-        raise SystemExit(
-            f"Missing environment variable(s): {', '.join(missing)}.\n"
+        raise RuntimeError(
+            f"Missing environment variable(s): {', '.join(missing)}. "
             f"Copy .env.example to .env and fill them in."
         )
     return {name: os.environ[name] for name in REQUIRED_ENV_VARS}
@@ -96,13 +115,14 @@ async def run_caller(
     personality: str = PERSONALITY_EASY,
 ) -> None:
     """Run one call to completion over the given transport."""
-    env = _require_env()
+    env = require_env()
 
-    stt = DeepgramSTTService(api_key=env["DEEPGRAM_API_KEY"])
+    stt = DeepgramSTTService(api_key=env["DEEPGRAM_API_KEY"], model=CALLER_STT_MODEL)
     llm = OpenAILLMService(api_key=env["OPENAI_API_KEY"], model=CALLER_LLM_MODEL)
     tts = CartesiaTTSService(
         api_key=env["CARTESIA_API_KEY"],
         voice_id=CALLER_VOICE_ID,
+        model=CALLER_TTS_MODEL,
         sample_rate=AUDIO_SAMPLE_RATE,
     )
 
@@ -167,6 +187,7 @@ async def run_caller(
     await WorkerRunner().run(worker)
 
 
-def _setup_logging() -> None:
+def setup_logging() -> None:
+    """Keep the turn-by-turn transcript readable instead of buried under pipecat's DEBUG."""
     logger.remove()
     logger.add(sys.stderr, level="INFO")

@@ -63,7 +63,9 @@ to the points below invalidates comparability with previously published runs.
 
 ```
 src/voicebench/
-  caller/      Pipecat calling agent (closed 6-turn script)
+  caller/      Pipecat calling agent (closed script, 7 intents in fixed order)
+  telephony/   Twilio: placing the call, bridging its audio. Our instrument, not a platform
+  api.py       Test endpoint: dials one fixed number to prove the agent works
   providers/   Per-platform agent setup + call placement (vapi, retell, elevenlabs, pipecat, livekit)
   analysis/    Offline audio analysis: VAD/RMS, latency extraction, percentiles
 tests/         pytest

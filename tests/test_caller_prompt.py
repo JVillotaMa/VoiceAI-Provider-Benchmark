@@ -59,3 +59,16 @@ def test_negotiation_is_bounded() -> None:
 
 def test_caller_does_not_speak_first() -> None:
     assert "Wait for them to speak" in TASK
+
+
+def test_every_model_is_pinned_not_left_to_a_library_default() -> None:
+    # A library default is not frozen: a dependency bump inside our own allowed range can change
+    # it, and the stimulus would change with no line of our code touched. A voice id alone does
+    # not freeze the stimulus — the model that renders it does.
+    from voicebench.caller import agent
+
+    assert agent.CALLER_LLM_MODEL == "gpt-4.1-mini-2025-04-14"  # dated, not a moving alias
+    assert agent.CALLER_TTS_MODEL
+    assert agent.CALLER_STT_MODEL
+    assert agent.CALLER_VOICE_ID
+    assert agent.AUDIO_SAMPLE_RATE == 8000

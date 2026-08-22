@@ -30,6 +30,9 @@ dev = [
     "commitizen>=4.9",
 ]
 
+[project.scripts]
+voicebench-api = "voicebench.api:main"
+
 [build-system]
 requires = ["uv_build>=0.9.21,<0.10.0"]
 build-backend = "uv_build"

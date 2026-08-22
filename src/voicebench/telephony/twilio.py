@@ -8,9 +8,12 @@ from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketParams,
     FastAPIWebsocketTransport,
 )
+from twilio.http.http_client import TwilioHttpClient
 from twilio.rest import Client
 
 from voicebench.caller.agent import AUDIO_SAMPLE_RATE
+
+REQUEST_TIMEOUT_SECS = 15.0
 
 REQUIRED_ENV_VARS = (
     "TWILIO_ACCOUNT_SID",
@@ -55,7 +58,13 @@ def place_call(env: dict[str, str], stream_url: str) -> str:
     TwiML is passed inline rather than fetched from a callback route — the destination is known
     before dialling, so a callback buys nothing and would expose a second public route.
     """
-    client = Client(env["TWILIO_ACCOUNT_SID"], env["TWILIO_AUTH_TOKEN"])
+    # twilio-python has no default request timeout, so a hung request would otherwise hold the
+    # worker thread until something else gave up first.
+    client = Client(
+        env["TWILIO_ACCOUNT_SID"],
+        env["TWILIO_AUTH_TOKEN"],
+        http_client=TwilioHttpClient(timeout=REQUEST_TIMEOUT_SECS),
+    )
     call = client.calls.create(
         to=env["TEST_CALL_TO_NUMBER"],
         from_=env["TWILIO_FROM_NUMBER"],
